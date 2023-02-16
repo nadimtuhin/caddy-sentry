@@ -1,7 +1,11 @@
 localhost:80 {
-  # Only allow access to the event storing endpoint
-  route / {
-    respond "Not found" 404
+  @whitelist {
+    remote_ip 172.26.0.2
+  }
+
+  # allow access to the whitelisted IP
+  handle {
+    reverse_proxy @whitelist web:9000
   }
 
   # Proxy requests to the event storing endpoint of Sentry
