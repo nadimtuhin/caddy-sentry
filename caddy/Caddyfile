@@ -1,0 +1,15 @@
+localhost:80 {
+  # Only allow access to the event storing endpoint
+  route / {
+    respond "Not found" 404
+  }
+
+  # Proxy requests to the event storing endpoint of Sentry
+  route /api/*/store/* {
+    rate_limit {remote.ip} 10r/m
+    rate_limit {query} 10r/m
+    rate_limit {scheme} 60r/m
+    
+    reverse_proxy web:9000
+  }
+}

@@ -1,72 +1,72 @@
 version: "3"
 
+# See docs.getsentry.com/on-premise/server/ for full instructions
+x-defaults: &defaults
+  restart: unless-stopped
+  build:
+    context: .
+    dockerfile: sentry/Dockerfile
+  depends_on:
+    - redis
+    - postgres
+    - memcached
+  env_file: .env
+  sysctls:
+    net.core.somaxconn: 1024 
+  environment:
+    SENTRY_MEMCACHED_HOST: memcached
+    SENTRY_REDIS_HOST: redis
+    SENTRY_POSTGRES_HOST: postgres
+  volumes:
+    - sentry-data:/var/lib/sentry/files
+
+
 services:
+  memcached:
+    restart: unless-stopped
+    image: memcached:1.5-alpine
+
+  redis:
+    restart: unless-stopped
+    image: redis:3.2-alpine
+
+  postgres:
+    restart: unless-stopped
+    image: postgres:9.5
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: 'trust'
+    volumes:
+      - sentry-postgres:/var/lib/postgresql/data
+
+  web:
+    <<: *defaults
+    ports:
+      - '9000:9000'
+
+  cron:
+    <<: *defaults
+    command: run cron
+
+  worker:
+    <<: *defaults
+    command: run worker
+
   caddy:
-    platform: linux/amd64
-    image: caddy
+    # image: caddy
+    build:
+      context: .
+      dockerfile: caddy/Dockerfile
     container_name: caddy
     restart: always
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    networks:
-      - sentry_network
-
-  sentry:
-    platform: linux/amd64
-    image: sentry
-    container_name: sentry
-    restart: always
-    volumes:
-      - sentry_data:/var/lib/sentry/files
-      - sentry_postgres:/var/lib/postgresql/data
-    environment:
-      - SENTRY_SECRET_KEY=my-secret-key
-      - SENTRY_POSTGRES_HOST=postgres
-      - SENTRY_DB_NAME=sentry
-      - SENTRY_DB_USER=sentry
-      - SENTRY_DB_PASSWORD=sentry
-      - SENTRY_REDIS_HOST=redis
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - sentry_network
-
-  postgres:
-    image: postgres
-    container_name: postgres
-    restart: always
-    volumes:
-      - sentry_postgres:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=sentry
-      - POSTGRES_USER=sentry
-      - POSTGRES_PASSWORD=sentry
-    networks:
-      - sentry_network
-
-  redis:
-    platform: linux/amd64
-    image: redis
-    container_name: redis
-    restart: always
-    volumes:
-      - sentry_redis:/data
-    networks:
-      - sentry_network
 
 volumes:
-  sentry_data:
-  sentry_postgres:
-  sentry_redis:
-  caddy_data:
-  caddy_config:
-
-networks:
-  sentry_network:
-
+    sentry-data:
+    caddy_data:
+    caddy_config:
+    sentry-postgres:
